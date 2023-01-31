@@ -262,4 +262,3 @@ plt.title('social isolation')
 plt.ylabel('scores')
 
 plt.tight_layout(pad = 3.0)
-
