@@ -263,12 +263,3 @@ plt.ylabel('scores')
 
 plt.tight_layout(pad = 3.0)
 
-
-# Step 19:
-# Perform independent samples t-tests for each of the above scores
-
-from scipy import stats
-print(stats.ttest_ind(highest_algorex_food,lowest_algorex_food))
-print(stats.ttest_ind(highest_algorex_housing,lowest_algorex_housing))
-print(stats.ttest_ind(highest_algorex_transport,lowest_algorex_transport))
-print(stats.ttest_ind(highest_algorex_social,lowest_algorex_social))
