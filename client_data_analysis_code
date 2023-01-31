@@ -1,0 +1,274 @@
+# Step 1:
+# Before beginning, insert the location of the data_analyst_challenge.db file within the quotes below.
+# It should look something like this:
+# dbfile = '/Desktop/data_analyst_challenge.db'
+
+dbfile = ''
+
+
+# Step 2:
+# Import sqlite and create connection with the db file
+
+import sqlite3
+connection = sqlite3.connect(dbfile)
+cur = connection.cursor()
+
+
+# Step 3:
+# Create a new table called std_member_info and designate column names
+
+cur.execute('''CREATE TABLE std_member_info
+(member_id TEXT, member_first_name TEXT, member_last_name TEXT,
+date_of_birth TEXT, main_address TEXT, city TEXT, state TEXT,
+zip_code TEXT, payer TEXT)''')
+
+
+# Step 4:
+# Add data to the table from rosters 1-5
+# (Note that roster 2 has eligibility dates formatted differently, requiring different selection criteria)
+
+cur.execute('''INSERT INTO std_member_info(member_id, member_first_name, member_last_name,
+date_of_birth, main_address, city, state, zip_code, payer)
+SELECT Person_Id, First_Name, Last_Name, Dob, Street_Address,
+City, State, Zip, payer FROM roster_1
+WHERE eligibility_start_date <= '2022-04-01'
+AND eligibility_end_date >= '2022-05-01' ''')
+
+cur.execute('''INSERT INTO std_member_info(member_id, member_first_name, member_last_name,
+date_of_birth, main_address, city, state, zip_code, payer)
+SELECT Person_Id, First_Name, Last_Name, Dob, Street_Address,
+City, State, Zip, payer FROM roster_2
+WHERE eligibility_start_date >= '04/01/2022'
+AND eligibility_end_date <= '05/01/2022' ''')
+
+cur.execute('''INSERT INTO std_member_info(member_id, member_first_name, member_last_name,
+date_of_birth, main_address, city, state, zip_code, payer)
+SELECT Person_Id, First_Name, Last_Name, Dob, Street_Address,
+City, State, Zip, payer FROM roster_3
+WHERE eligibility_start_date <= '2022-04-01'
+AND eligibility_end_date >= '2022-05-01' ''')
+
+cur.execute('''INSERT INTO std_member_info(member_id, member_first_name, member_last_name,
+date_of_birth, main_address, city, state, zip_code, payer)
+SELECT Person_Id, First_Name, Last_Name, Dob, Street_Address,
+City, State, Zip, payer FROM roster_4
+WHERE eligibility_start_date <= '2022-04-01'
+AND eligibility_end_date >= '2022-05-01' ''')
+
+cur.execute('''INSERT INTO std_member_info(member_id, member_first_name, member_last_name,
+date_of_birth, main_address, city, state, zip_code, payer)
+SELECT Person_Id, First_Name, Last_Name, Dob, Street_Address,
+City, State, Zip, payer FROM roster_5
+WHERE eligibility_start_date <= '2022-04-01'
+AND eligibility_end_date >= '2022-05-01' ''')
+
+
+# Step 5:
+# View header and total number of rows for std_member_info
+
+cur.execute('''SELECT * FROM std_member_info LIMIT 5''')
+print(cur.fetchall())
+
+cur.execute('''SELECT COUNT(*) FROM std_member_info''')
+print(cur.fetchall())
+
+
+# Step 6:
+# Count how many distinct members are eligible in April 2022
+
+cur.execute('''SELECT COUNT(DISTINCT member_id)
+FROM std_member_info''')
+print(cur.fetchall())
+
+
+# Step 7:
+# Determine how many members were included more than once
+
+cur.execute('''SELECT COUNT(*) FROM (
+SELECT member_id, COUNT(*)
+FROM std_member_info
+GROUP BY member_id
+HAVING COUNT(*) >1
+) T''')
+print(cur.fetchall())
+
+
+# Step 8:
+# Create new table that only includes unique members
+
+cur.execute('''CREATE TABLE std_member_info_unique AS
+SELECT *
+, 1 AS member_id
+, MAX(date_of_birth) AS date_of_birth
+FROM std_member_info
+WHERE member_id = member_id
+GROUP BY member_id''')
+
+
+# Step 9:
+# List the breakdown of unique members by payer
+
+cur.execute('''SELECT COUNT (member_id), payer
+FROM std_member_info_unique
+GROUP BY payer''')
+print(cur.fetchall())
+
+
+# Step 10:
+# Count how many unique members live in a zip code with a food_access_score lower than 2
+
+cur.execute('''SELECT COUNT(*) AS totalundertwo FROM (
+SELECT DISTINCT std_member_info_unique.member_id, 
+std_member_info_unique.zip_code, model_scores_by_zip.food_access_score
+FROM std_member_info_unique
+INNER JOIN model_scores_by_zip
+ON std_member_info_unique.zip_code = model_scores_by_zip.zcta
+WHERE model_scores_by_zip.food_access_score < 2
+ORDER BY food_access_score DESC
+) T''')
+print(cur.fetchall())
+
+
+# Step 11:
+# Calculate the average social isolation score for the unique members
+
+cur.execute('''SELECT AVG(social_isolation_score) AS avg_social_score FROM (
+SELECT DISTINCT std_member_info_unique.member_id, std_member_info_unique.zip_code, 
+model_scores_by_zip.social_isolation_score
+FROM std_member_info_unique
+INNER JOIN model_scores_by_zip
+on std_member_info_unique.zip_code = model_scores_by_zip.zcta
+) T''')
+print(cur.fetchall())
+
+
+# Step 12:
+# List the unique members who live in the zip code with the highest algorex_sdoh_composite_score
+
+cur.execute('''SELECT std_member_info_unique.member_id, std_member_info_unique.member_first_name,
+std_member_info_unique.member_last_name, model_scores_by_zip.algorex_sdoh_composite_score
+FROM std_member_info_unique
+INNER JOIN model_scores_by_zip
+ON std_member_info_unique.zip_code = model_scores_by_zip.zcta
+WHERE algorex_sdoh_composite_score =
+(SELECT MAX(algorex_sdoh_composite_score)
+FROM model_scores_by_zip)''')
+print(cur.fetchall())
+
+
+# Step 13:
+# Create a table with zip code based scores for further analysis
+
+cur.execute('''CREATE TABLE table_for_stats AS
+SELECT std_member_info_unique.member_id, 
+model_scores_by_zip.neighborhood_stress_score,
+model_scores_by_zip.algorex_sdoh_composite_score,
+model_scores_by_zip.social_isolation_score,
+model_scores_by_zip.transportation_access_score,
+model_scores_by_zip.food_access_score,
+model_scores_by_zip.unstable_housing_score,
+model_scores_by_zip.state_govt_assistance,
+model_scores_by_zip.homeless_indicator,
+model_scores_by_zip.derived_indicator
+FROM std_member_info_unique
+INNER JOIN model_scores_by_zip
+ON std_member_info_unique.zip_code = model_scores_by_zip.zcta''')
+
+
+# Step 14:
+# Commit changes and close connection to database
+
+connection.commit()
+connection.close()
+
+
+# Step 15:
+# Import python packages and convert table_for_stats to dataframe
+
+import pandas as pd
+import sqlite3
+import matplotlib.pyplot as plt
+plt.style.use('seaborn-colorblind')
+
+cnx = sqlite3.connect(dbfile)
+sql_data = pd.read_sql_query('SELECT * FROM table_for_stats', con=cnx) 
+df = pd.DataFrame(sql_data, columns=['member_id', 'neighborhood_stress_score',
+                                      'algorex_sdoh_composite_score', 'social_isolation_score',
+                                      'transportation_access_score', 'food_access_score',
+                                      'unstable_housing_score','state_govt_assistance',
+                                      'homeless_indicator', 'derived_indicator'])
+print(df.info())
+
+
+# Step 16:
+# Select the subset of members in algorex composite tier "very high risk", 
+# as well as the subset of members in algorex composite tier "very low risk", for comparison.
+
+# Note: Ideally I believe we would segment this client's members according to algorex composite tiers calculated 
+# across ALL of N1 Health's members; however, in this case the tiers are calculated off of these members alone 
+# since that is the information that is available.
+
+df['algorex_sdoh_composite_tier'] = pd.qcut(df['algorex_sdoh_composite_score'], q=5, 
+labels=['very low risk','low risk','medium risk','high risk','very high risk'])
+
+highest_algorex = df[df['algorex_sdoh_composite_tier'] == 'very high risk']
+print(highest_algorex.info())
+lowest_algorex = df[df['algorex_sdoh_composite_tier'] == 'very low risk']
+print(lowest_algorex.info())
+
+
+# Step 17:
+# Select scores for food access, unstable housing, and transportation access for each of these groups
+
+highest_algorex_food = highest_algorex['food_access_score']
+highest_algorex_housing = highest_algorex['unstable_housing_score']
+highest_algorex_transport = highest_algorex['transportation_access_score']
+highest_algorex_social = highest_algorex['social_isolation_score']
+
+lowest_algorex_food = lowest_algorex['food_access_score']
+lowest_algorex_housing = lowest_algorex['unstable_housing_score']
+lowest_algorex_transport = lowest_algorex['transportation_access_score']
+lowest_algorex_social = lowest_algorex['social_isolation_score']
+
+
+# Step 18:
+# Create boxplots comparing the distributions of each of these scores for members 
+# with the highest vs. lowest algorex scores
+
+print('Distibutions of scores in members with the highest vs the lowest algorex scores: \n')
+
+plt.subplot(2,2,1)
+plt.boxplot([highest_algorex_food,lowest_algorex_food],labels=['very high risk','very low risk'], widths = .25)
+plt.ylim([0,10])
+plt.title('food access')
+plt.ylabel('scores')
+
+plt.subplot(2,2,2)
+plt.boxplot([highest_algorex_housing,lowest_algorex_housing],labels=['very high risk','very low risk'], widths = .25)
+plt.ylim([0,10])
+plt.title('unstable housing')
+plt.ylabel('scores')
+
+plt.subplot(2,2,3)
+plt.boxplot([highest_algorex_transport,lowest_algorex_transport],labels=['very high risk','very low risk'], widths = .25)
+plt.ylim([0,10])
+plt.title('transportation access')
+plt.ylabel('scores')
+
+plt.subplot(2,2,4)
+plt.boxplot([highest_algorex_social,lowest_algorex_social],labels=['very high risk','very low risk'], widths = .25)
+plt.ylim([0,10])
+plt.title('social isolation')
+plt.ylabel('scores')
+
+plt.tight_layout(pad = 3.0)
+
+
+# Step 19:
+# Perform independent samples t-tests for each of the above scores
+
+from scipy import stats
+print(stats.ttest_ind(highest_algorex_food,lowest_algorex_food))
+print(stats.ttest_ind(highest_algorex_housing,lowest_algorex_housing))
+print(stats.ttest_ind(highest_algorex_transport,lowest_algorex_transport))
+print(stats.ttest_ind(highest_algorex_social,lowest_algorex_social))
